@@ -38,7 +38,7 @@ typedef struct {
         size_t len;
 } jpg_chunking_t;
 
-#define PART_BOUNDARY "123456789000000000000987654321"
+#define PART_BOUNDARY "somerandomverysecretstringlol"
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
@@ -47,7 +47,6 @@ static ra_filter_t ra_filter;
 httpd_handle_t stream_httpd = NULL;
 httpd_handle_t camera_httpd = NULL;
 
-static mtmn_config_t mtmn_config = {0};
 
 static ra_filter_t * ra_filter_init(ra_filter_t * filter, size_t sample_size){
     memset(filter, 0, sizeof(ra_filter_t));
@@ -124,12 +123,11 @@ static esp_err_t capture_handler(httpd_req_t *req){
 static esp_err_t stream_handler(httpd_req_t *req){
     camera_fb_t * fb = NULL;
     esp_err_t res = ESP_OK;
-    size_t _jpg_buf_len = 0;
-    uint8_t * _jpg_buf = NULL;
+    size_t _jpg_buf_len;
+    uint8_t * _jpg_buf;
     char * part_buf[64];
-    
-
     static int64_t last_frame = 0;
+
     if(!last_frame) {
         last_frame = esp_timer_get_time();
     }
@@ -147,22 +145,22 @@ static esp_err_t stream_handler(httpd_req_t *req){
         if (!fb) {
             Serial.println("Camera capture failed");
             res = ESP_FAIL;
-        } else {
-            
-            if(fb->format != PIXFORMAT_JPEG){
-                bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-                esp_camera_fb_return(fb);
-                fb = NULL;
-                if(!jpeg_converted){
-                    Serial.println("JPEG compression failed");
-                    res = ESP_FAIL;
-                }
-            } else {
-                _jpg_buf_len = fb->len;
-                _jpg_buf = fb->buf;
-            }
-            
+            break;
         }
+            
+        if(fb->format != PIXFORMAT_JPEG){
+            bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+            if(!jpeg_converted){
+                Serial.println("JPEG compression failed");
+                esp_camera_fb_return(fb);
+                res = ESP_FAIL;
+            }
+        } else {
+            _jpg_buf_len = fb->len;
+            _jpg_buf = fb->buf;
+        }
+            
+        
         if(res == ESP_OK){
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
@@ -173,20 +171,19 @@ static esp_err_t stream_handler(httpd_req_t *req){
         if(res == ESP_OK){
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
         }
-        if(fb){
-            esp_camera_fb_return(fb);
-            fb = NULL;
-            _jpg_buf = NULL;
-        } else if(_jpg_buf){
+
+        if(fb->format != PIXFORMAT_JPEG){
             free(_jpg_buf);
-            _jpg_buf = NULL;
         }
+        esp_camera_fb_return(fb);
+
         if(res != ESP_OK){
             break;
         }
+
         int64_t fr_end = esp_timer_get_time();
-    
         int64_t frame_time = fr_end - last_frame;
+        
         last_frame = fr_end;
         frame_time /= 1000;
         uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
@@ -324,7 +321,7 @@ static esp_err_t index_handler(httpd_req_t *req){
     return httpd_resp_send(req, (const char *)index_ov2640_html_gz, index_ov2640_html_gz_len);
 }
 
-void startCameraServer(){
+void startCameraServer() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     httpd_uri_t index_uri = {
@@ -365,19 +362,7 @@ void startCameraServer(){
 
     ra_filter_init(&ra_filter, 20);
     
-    mtmn_config.type = FAST;
-    mtmn_config.min_face = 80;
-    mtmn_config.pyramid = 0.707;
-    mtmn_config.pyramid_times = 4;
-    mtmn_config.p_threshold.score = 0.6;
-    mtmn_config.p_threshold.nms = 0.7;
-    mtmn_config.p_threshold.candidate_number = 20;
-    mtmn_config.r_threshold.score = 0.7;
-    mtmn_config.r_threshold.nms = 0.7;
-    mtmn_config.r_threshold.candidate_number = 10;
-    mtmn_config.o_threshold.score = 0.7;
-    mtmn_config.o_threshold.nms = 0.7;
-    mtmn_config.o_threshold.candidate_number = 1;
+
     
     Serial.printf("Starting web server on port: '%d'\n", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK) {

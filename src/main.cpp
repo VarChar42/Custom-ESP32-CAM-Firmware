@@ -7,6 +7,10 @@
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PW;
 
+const IPAddress ip = WIFI_IP;
+const IPAddress gateway = WIFI_GATEWAY;
+const IPAddress subnet = WIFI_SUBNET;
+
 void startCameraServer();
 
 void setup() {
@@ -33,14 +37,16 @@ void setup() {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;
   config.pixel_format = PIXFORMAT_JPEG;
+  
   
  
   if(psramFound()){
     config.frame_size = FRAMESIZE_UXGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
+    
   } else {
     config.frame_size = FRAMESIZE_SVGA;
     config.jpeg_quality = 12;
@@ -65,20 +71,30 @@ void setup() {
   // drop down frame size for higher initial frame rate
   s->set_framesize(s, FRAMESIZE_QVGA);
 
-  WiFi.begin(ssid, password);
+  WiFi.config(ip, gateway, subnet);
+  
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  Serial.print("Connecting: ");
+
+  wl_status_t wifi_status = WL_DISCONNECTED;
+
+  while (wifi_status != WL_CONNECTED) {
+    WiFi.begin(ssid, password);
+  
+    Serial.print(wifi_status);
+    delay(1000);
+    wifi_status = WiFi.status();
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
+  
+  Serial.print("  CONNECTED");
+  Serial.print("\n\n\n");
+  
 
   startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
+
+  Serial.print("Control panel: 'http://");
   Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
 }
 
 void loop() {

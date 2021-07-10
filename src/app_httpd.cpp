@@ -139,6 +139,8 @@ static esp_err_t stream_handler(httpd_req_t *req){
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
+    uint32_t debug_msg_cooldown = 0;
+
     while(true){
     
         fb = esp_camera_fb_get();
@@ -186,12 +188,23 @@ static esp_err_t stream_handler(httpd_req_t *req){
         
         last_frame = fr_end;
         frame_time /= 1000;
+
         uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-        Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps) \n",
+
+        debug_msg_cooldown++;
+        if (debug_msg_cooldown > 60)
+        {
+            debug_msg_cooldown = 0;
+            Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps) \n",
             (uint32_t)(_jpg_buf_len),
             (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
             avg_frame_time, 1000.0 / avg_frame_time
         );
+        }
+        
+
+        
+        
     }
 
     last_frame = 0;

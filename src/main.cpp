@@ -72,18 +72,23 @@ void setup() {
   s->set_framesize(s, FRAMESIZE_QVGA);
 
   WiFi.config(ip, gateway, subnet);
-  
-
   Serial.print("Connecting: ");
+  WiFi.begin(ssid, password);
 
   wl_status_t wifi_status = WL_DISCONNECTED;
+  uint32_t wifi_try_counter = 0;
 
   while (wifi_status != WL_CONNECTED) {
-    WiFi.begin(ssid, password);
-  
-    Serial.print(wifi_status);
-    delay(1000);
+    delay(100);
+    wifi_try_counter++;
     wifi_status = WiFi.status();
+    Serial.print(wifi_status);
+
+    if (wifi_try_counter > 50) {
+      Serial.println("\nRestarting... (Connecting took too long)");
+      ESP.restart();
+    }
+
   }
   
   Serial.print("  CONNECTED");
@@ -93,7 +98,7 @@ void setup() {
   startCameraServer();
 
 
-  Serial.print("Control panel: 'http://");
+  Serial.print("IP: ");
   Serial.print(WiFi.localIP());
 }
 
